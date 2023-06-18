@@ -18,8 +18,11 @@ To use Liver, you need a `liver.json` file in the root of your directory with th
         "/other/path/index.js"
     ],
     "procs": {
-        "/some/path": "go run main.go",
-        "/other/path": "node index.js"
+        "/some/path": [ "go run main.go" ],
+        "/other/path": [
+            "node index.js",
+            "node index2.js"
+        ]
     }
 }
 ```

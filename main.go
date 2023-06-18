@@ -14,8 +14,8 @@ import (
 )
 
 type config struct {
-	Paths []string          `json:"paths"`
-	Procs map[string]string `json:"procs"`
+	Paths []string            `json:"paths"`
+	Procs map[string][]string `json:"procs"`
 }
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 
 	c := &config{
 		Paths: make([]string, 0),
-		Procs: make(map[string]string),
+		Procs: make(map[string][]string),
 	}
 
 	err = json.Unmarshal(fileBytes, c)
@@ -54,10 +54,12 @@ func main() {
 		}
 	}
 
-	for path, command := range c.Procs {
-		err = pm.Add(path, command)
-		if err != nil {
-			log.Fatalf("error adding process for path %s: %v\n", path, err)
+	for path, commands := range c.Procs {
+		for _, c := range commands {
+			err = pm.Add(path, c)
+			if err != nil {
+				log.Fatalf("error adding process for path %s: %v\n", path, err)
+			}
 		}
 	}
 
