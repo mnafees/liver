@@ -65,7 +65,7 @@ func main() {
 
 	go func() {
 		var (
-			waitFor = time.Second
+			waitFor = 2 * time.Second
 
 			// Keep track of the timers, as path → timer.
 			mu     sync.Mutex
