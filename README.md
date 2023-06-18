@@ -1,6 +1,6 @@
 # Liver
 
-A recursive file watcher that works by attaching itself to processes
+A dead simple recursive file watcher that works by attaching itself to processes
 
 ## Installation
 

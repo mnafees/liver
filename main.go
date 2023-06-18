@@ -56,10 +56,7 @@ func main() {
 
 	for path, commands := range c.Procs {
 		for _, c := range commands {
-			err = pm.Add(path, c)
-			if err != nil {
-				log.Fatalf("error adding process for path %s: %v\n", path, err)
-			}
+			pm.Add(path, c)
 		}
 	}
 
@@ -77,7 +74,7 @@ func main() {
 
 		log.Println("starting all processes")
 
-		err := pm.Start()
+		err := pm.StartAll()
 		if err != nil {
 			log.Fatalf("error starting processes: %v\n", err)
 			sig <- os.Interrupt
@@ -92,7 +89,10 @@ func main() {
 				if !ok {
 					sig <- os.Interrupt
 					return
-				} else if !pm.Valid(event.Name) {
+				}
+
+				procs := pm.GetProcs(event.Name)
+				if len(procs) == 0 {
 					continue
 				}
 
@@ -102,21 +102,25 @@ func main() {
 
 				if !ok {
 					t = time.AfterFunc(math.MaxInt64, func() {
-						log.Println("stopping all processes")
+						log.Println("stopping processes")
 
-						err := pm.Stop()
-						if err != nil {
-							log.Fatalf("error stopping processes: %v\n", err)
+						for _, p := range procs {
+							err := p.Kill()
+							if err != nil {
+								log.Fatalf("error stopping processes: %v\n", err)
+							}
 						}
 
-						log.Println("restarting all processes")
+						log.Println("restarting processes")
 
-						err = pm.Start()
-						if err != nil {
-							log.Fatalf("error starting processes: %v\n", err)
+						for _, p := range procs {
+							err = p.Start()
+							if err != nil {
+								log.Fatalf("error starting processes: %v\n", err)
+							}
 						}
 
-						log.Println("restarted all processes")
+						log.Println("restarted processes")
 
 						mu.Lock()
 						delete(timers, event.Name)
@@ -145,7 +149,7 @@ func main() {
 
 	log.Println("stopping all processes")
 
-	err = pm.Stop()
+	err = pm.StopAll()
 	if err != nil {
 		log.Fatalf("error stopping processes: %v\n", err)
 	}

@@ -1,111 +1,74 @@
 package process
 
 import (
-	"fmt"
 	"log"
 	"strings"
 	"sync"
 )
 
 type ProcessManager struct {
-	root  *trie
-	procs []*process
+	procs map[string][]*process
 	mu    *sync.Mutex
 }
 
 func NewProcessManager() *ProcessManager {
-	rootNode := &trieNode{
-		children: make(map[string]*trieNode),
-	}
-
-	rootNode.children["/"] = newNode()
-
 	return &ProcessManager{
-		root: &trie{
-			node: rootNode,
-		},
-		procs: make([]*process, 0),
+		procs: make(map[string][]*process),
 		mu:    &sync.Mutex{},
 	}
 }
 
-func (pm *ProcessManager) Add(path, command string) error {
+func (pm *ProcessManager) Add(path, command string) {
 	p := newProcess(command)
-	chars := strings.Split(path, "")
 
-	if chars[0] != "/" {
-		return fmt.Errorf("expected UNIX filesystem absolute path starting with '/', got %s", path)
+	if _, ok := pm.procs[path]; !ok {
+		pm.procs[path] = make([]*process, 0)
 	}
 
-	chars = chars[1:]
-
-	curr := pm.root.node
-
-	for _, c := range chars {
-		if _, ok := curr.children[c]; !ok {
-			curr.children[c] = newNode()
-		}
-
-		curr = curr.children[c]
-	}
-
-	curr.proc = p
-
-	pm.procs = append(pm.procs, p)
-
-	return nil
+	pm.procs[path] = append(pm.procs[path], p)
 }
 
-func (pm *ProcessManager) Start() error {
+func (pm *ProcessManager) StartAll() error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
-	for _, p := range pm.procs {
-		err := p.start()
-		if err != nil {
-			return err
+	for _, procs := range pm.procs {
+		for _, p := range procs {
+			err := p.Start()
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (pm *ProcessManager) Stop() error {
+func (pm *ProcessManager) StopAll() error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
-	for _, p := range pm.procs {
-		err := p.kill()
-		if err != nil {
-			log.Println(err)
+	for _, procs := range pm.procs {
+		for _, p := range procs {
+			err := p.Kill()
+			if err != nil {
+				log.Println(err)
+			}
 		}
 	}
 
 	return nil
 }
 
-func (pm *ProcessManager) Valid(path string) bool {
-	chars := strings.Split(path, "")
+func (pm *ProcessManager) GetProcs(path string) []*process {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
 
-	if chars[0] != "/" {
-		return false
+	for procPath, procs := range pm.procs {
+		if strings.HasPrefix(path, procPath) {
+			return procs
+		}
 	}
 
-	chars = chars[1:]
-
-	curr := pm.root.node
-
-	for _, c := range chars {
-		if curr.isLeaf() {
-			return true
-		}
-
-		if _, ok := curr.children[c]; !ok {
-			return false
-		}
-
-		curr = curr.children[c]
-	}
-
-	return curr.isLeaf()
+	return []*process{}
 }

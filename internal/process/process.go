@@ -23,7 +23,7 @@ func newProcess(command string) *process {
 	}
 }
 
-func (p *process) start() error {
+func (p *process) Start() error {
 	if p == nil {
 		return nil
 	}
@@ -41,7 +41,7 @@ func (p *process) start() error {
 	return p.internalProcessCmd.Start()
 }
 
-func (p *process) kill() error {
+func (p *process) Kill() error {
 	if p == nil || p.internalProcessCmd == nil || p.internalProcessCmd.Process == nil {
 		return nil
 	}
