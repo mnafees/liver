@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 )
 
 type ProcessManager struct {
 	root  *trie
 	procs []*process
+	mu    *sync.Mutex
 }
 
 func NewProcessManager() *ProcessManager {
@@ -23,6 +25,7 @@ func NewProcessManager() *ProcessManager {
 			node: rootNode,
 		},
 		procs: make([]*process, 0),
+		mu:    &sync.Mutex{},
 	}
 }
 
@@ -54,6 +57,9 @@ func (pm *ProcessManager) Add(path, command string) error {
 }
 
 func (pm *ProcessManager) Start() error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
 	for _, p := range pm.procs {
 		err := p.start()
 		if err != nil {
@@ -65,6 +71,9 @@ func (pm *ProcessManager) Start() error {
 }
 
 func (pm *ProcessManager) Stop() error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
 	for _, p := range pm.procs {
 		err := p.kill()
 		if err != nil {
@@ -73,4 +82,26 @@ func (pm *ProcessManager) Stop() error {
 	}
 
 	return nil
+}
+
+func (pm *ProcessManager) Valid(path string) bool {
+	chars := strings.Split(path, "")
+
+	if chars[0] != "/" {
+		return false
+	}
+
+	chars = chars[1:]
+
+	curr := pm.root.node
+
+	for _, c := range chars {
+		if _, ok := curr.children[c]; !ok {
+			return false
+		}
+
+		curr = curr.children[c]
+	}
+
+	return curr.isLeaf()
 }

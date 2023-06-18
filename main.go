@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/mnafees/liver/internal/process"
 	"github.com/mnafees/liver/internal/watcher"
 )
@@ -42,7 +41,7 @@ func main() {
 
 	pm := process.NewProcessManager()
 
-	watcher := watcher.NewWatcher(pm)
+	watcher := watcher.NewWatcher()
 	defer watcher.Close()
 
 	for _, path := range c.Paths {
@@ -73,18 +72,25 @@ func main() {
 		for {
 			select {
 			case event, ok := <-watcher.Events():
-				if !ok {
+				if !ok || !pm.Valid(event.Name) {
 					return
 				}
-				log.Println("event:", event)
-				if event.Has(fsnotify.Write) {
-					log.Println("modified file:", event.Name)
+
+				err := pm.Stop()
+				if err != nil {
+					log.Fatalf("error stopping processes: %v\n", err)
+				}
+
+				err = pm.Start()
+				if err != nil {
+					log.Fatalf("error starting processes: %v\n", err)
 				}
 			case err, ok := <-watcher.Errors():
 				if !ok {
 					return
 				}
-				log.Println("error:", err)
+
+				log.Println("watcher error: ", err)
 			}
 		}
 	}()
