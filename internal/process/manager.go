@@ -96,6 +96,10 @@ func (pm *ProcessManager) Valid(path string) bool {
 	curr := pm.root.node
 
 	for _, c := range chars {
+		if curr.isLeaf() {
+			return true
+		}
+
 		if _, ok := curr.children[c]; !ok {
 			return false
 		}

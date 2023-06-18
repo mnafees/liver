@@ -3,8 +3,11 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"math"
 	"os"
 	"os/signal"
+	"sync"
+	"time"
 
 	"github.com/mnafees/liver/internal/process"
 	"github.com/mnafees/liver/internal/watcher"
@@ -62,6 +65,14 @@ func main() {
 	signal.Notify(sig, os.Interrupt)
 
 	go func() {
+		var (
+			waitFor = time.Second
+
+			// Keep track of the timers, as path → timer.
+			mu     sync.Mutex
+			timers = make(map[string]*time.Timer)
+		)
+
 		log.Println("starting all processes")
 
 		err := pm.Start()
@@ -77,29 +88,50 @@ func main() {
 			select {
 			case event, ok := <-watcher.Events():
 				if !ok {
+					sig <- os.Interrupt
+					return
+				} else if !pm.Valid(event.Name) {
 					continue
 				}
 
-				log.Printf("watcher event: %v\n", event)
+				mu.Lock()
+				t, ok := timers[event.Name]
+				mu.Unlock()
 
-				log.Println("stopping all processes")
+				if !ok {
+					t = time.AfterFunc(math.MaxInt64, func() {
+						log.Println("stopping all processes")
 
-				err := pm.Stop()
-				if err != nil {
-					log.Fatalf("error stopping processes: %v\n", err)
+						err := pm.Stop()
+						if err != nil {
+							log.Fatalf("error stopping processes: %v\n", err)
+						}
+
+						log.Println("restarting all processes")
+
+						err = pm.Start()
+						if err != nil {
+							log.Fatalf("error starting processes: %v\n", err)
+						}
+
+						log.Println("restarted all processes")
+
+						mu.Lock()
+						delete(timers, event.Name)
+						mu.Unlock()
+					})
+					t.Stop()
+
+					mu.Lock()
+					timers[event.Name] = t
+					mu.Unlock()
 				}
 
-				log.Println("restarting all processes")
-
-				err = pm.Start()
-				if err != nil {
-					log.Fatalf("error starting processes: %v\n", err)
-				}
-
-				log.Println("restarted all processes")
+				t.Reset(waitFor)
 			case err, ok := <-watcher.Errors():
 				if !ok {
-					continue
+					sig <- os.Interrupt
+					return
 				}
 
 				log.Println("watcher error: ", err)
