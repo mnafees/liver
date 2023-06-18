@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"os/signal"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mnafees/liver/internal/process"
 	"github.com/mnafees/liver/internal/watcher"
 )
 
@@ -38,7 +40,9 @@ func main() {
 		log.Fatalln("no procs specified")
 	}
 
-	watcher := watcher.NewWatcher()
+	pm := process.NewProcessManager()
+
+	watcher := watcher.NewWatcher(pm)
 	defer watcher.Close()
 
 	for _, path := range c.Paths {
@@ -48,7 +52,24 @@ func main() {
 		}
 	}
 
+	for path, command := range c.Procs {
+		err = pm.Add(path, command)
+		if err != nil {
+			log.Fatalf("error adding process for path %s: %v\n", path, err)
+		}
+	}
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig)
+
 	go func() {
+		err := pm.Start()
+		if err != nil {
+			log.Fatalf("error starting processes: %v\n", err)
+			sig <- os.Interrupt
+			return
+		}
+
 		for {
 			select {
 			case event, ok := <-watcher.Events():
@@ -68,6 +89,12 @@ func main() {
 		}
 	}()
 
-	// Block main goroutine forever.
-	<-make(chan struct{})
+	<-sig
+
+	log.Println("exiting gracefully")
+
+	err = pm.Stop()
+	if err != nil {
+		log.Fatalf("error stopping processes: %v\n", err)
+	}
 }

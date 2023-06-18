@@ -7,13 +7,15 @@ import (
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mnafees/liver/internal/process"
 )
 
 type Watcher struct {
 	internalWatcher *fsnotify.Watcher
+	pm              *process.ProcessManager
 }
 
-func NewWatcher() *Watcher {
+func NewWatcher(pm *process.ProcessManager) *Watcher {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
@@ -21,6 +23,7 @@ func NewWatcher() *Watcher {
 
 	return &Watcher{
 		internalWatcher: watcher,
+		pm:              pm,
 	}
 }
 
