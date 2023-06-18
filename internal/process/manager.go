@@ -60,8 +60,6 @@ func (pm *ProcessManager) Start() error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
-	log.Println("starting processes")
-
 	for _, p := range pm.procs {
 		err := p.start()
 		if err != nil {
@@ -75,8 +73,6 @@ func (pm *ProcessManager) Start() error {
 func (pm *ProcessManager) Stop() error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-
-	log.Println("stopping processes")
 
 	for _, p := range pm.procs {
 		err := p.kill()

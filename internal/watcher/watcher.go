@@ -34,6 +34,10 @@ func (w *Watcher) Add(path string) error {
 		return fmt.Errorf("error getting absolute path for %s: %w", path, err)
 	}
 
+	if filepath.Base(path) == "liver.json" {
+		return nil
+	}
+
 	file, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("error opening %s: %w", path, err)

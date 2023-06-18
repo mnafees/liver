@@ -59,9 +59,11 @@ func main() {
 	}
 
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig)
+	signal.Notify(sig, os.Interrupt)
 
 	go func() {
+		log.Println("starting all processes")
+
 		err := pm.Start()
 		if err != nil {
 			log.Fatalf("error starting processes: %v\n", err)
@@ -69,25 +71,35 @@ func main() {
 			return
 		}
 
+		log.Println("started all processes")
+
 		for {
 			select {
 			case event, ok := <-watcher.Events():
-				if !ok || !pm.Valid(event.Name) {
-					return
+				if !ok {
+					continue
 				}
+
+				log.Printf("watcher event: %v\n", event)
+
+				log.Println("stopping all processes")
 
 				err := pm.Stop()
 				if err != nil {
 					log.Fatalf("error stopping processes: %v\n", err)
 				}
 
+				log.Println("restarting all processes")
+
 				err = pm.Start()
 				if err != nil {
 					log.Fatalf("error starting processes: %v\n", err)
 				}
+
+				log.Println("restarted all processes")
 			case err, ok := <-watcher.Errors():
 				if !ok {
-					return
+					continue
 				}
 
 				log.Println("watcher error: ", err)
@@ -97,7 +109,7 @@ func main() {
 
 	<-sig
 
-	log.Println("exiting gracefully")
+	log.Println("stopping all processes")
 
 	err = pm.Stop()
 	if err != nil {

@@ -2,6 +2,7 @@ package process
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -10,26 +11,32 @@ import (
 type process struct {
 	internalProcessCmd *exec.Cmd
 	mu                 *sync.Mutex
+	args               []string
 }
 
 func newProcess(command string) *process {
 	args := strings.Split(command, " ")
 
-	cmd := exec.Command(args[0], args[1:]...)
-
 	return &process{
-		internalProcessCmd: cmd,
-		mu:                 &sync.Mutex{},
+		mu:   &sync.Mutex{},
+		args: args,
 	}
 }
 
 func (p *process) start() error {
-	if p == nil || p.internalProcessCmd == nil {
+	if p == nil {
 		return nil
 	}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	cmd := exec.Command(p.args[0], p.args[1:]...)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+
+	p.internalProcessCmd = cmd
 
 	return p.internalProcessCmd.Start()
 }
@@ -44,10 +51,15 @@ func (p *process) kill() error {
 
 	// first try to kill the process using the internal Process
 	err := p.internalProcessCmd.Process.Kill()
-	if err == nil {
-		return nil
+	if err != nil {
+		// try to do a kill -9 for the process PID
+		err = exec.Command("kill", "-9", fmt.Sprintf("%d", p.internalProcessCmd.Process.Pid)).Run()
+		if err != nil {
+			return fmt.Errorf("could not force kill process %d: %w", p.internalProcessCmd.Process.Pid, err)
+		}
 	}
 
-	// try to do a kill -9 for the process PID
-	return exec.Command("kill", "-9", fmt.Sprintf("%d", p.internalProcessCmd.Process.Pid)).Run()
+	p.internalProcessCmd = nil
+
+	return nil
 }
