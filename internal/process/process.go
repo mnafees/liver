@@ -8,18 +8,36 @@ import (
 	"sync"
 )
 
+type errWriter struct {
+	idx uint
+}
+
+func (ew *errWriter) Write(p []byte) (int, error) {
+	return fmt.Fprintf(os.Stderr, "[%d]: %s", ew.idx, string(p))
+}
+
+type outWriter struct {
+	idx uint
+}
+
+func (ow *outWriter) Write(p []byte) (int, error) {
+	return fmt.Fprintf(os.Stdout, "[%d]: %s", ow.idx, string(p))
+}
+
 type process struct {
 	internalProcessCmd *exec.Cmd
 	mu                 *sync.Mutex
 	args               []string
+	idx                uint
 }
 
-func newProcess(command string) *process {
+func newProcess(idx uint, command string) *process {
 	args := strings.Split(command, " ")
 
 	return &process{
 		mu:   &sync.Mutex{},
 		args: args,
+		idx:  idx,
 	}
 }
 
@@ -32,8 +50,8 @@ func (p *process) Start() error {
 	defer p.mu.Unlock()
 
 	cmd := exec.Command(p.args[0], p.args[1:]...)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
+	cmd.Stderr = &errWriter{idx: p.idx}
+	cmd.Stdout = &outWriter{idx: p.idx}
 	cmd.Stdin = os.Stdin
 
 	p.internalProcessCmd = cmd

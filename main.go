@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -54,11 +55,20 @@ func main() {
 		}
 	}
 
+	idx := uint(0)
+
+	fmt.Println()
+
 	for path, commands := range c.Procs {
 		for _, c := range commands {
-			pm.Add(path, c)
+			fmt.Printf("setting process %d for: %s\n", idx, c)
+
+			pm.Add(idx, path, c)
+			idx++
 		}
 	}
+
+	fmt.Println()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
@@ -81,7 +91,7 @@ func main() {
 			return
 		}
 
-		log.Println("started all processes")
+		log.Printf("started all processes\n\n")
 
 		for {
 			select {
@@ -102,7 +112,8 @@ func main() {
 
 				if !ok {
 					t = time.AfterFunc(math.MaxInt64, func() {
-						log.Println("stopping processes")
+						fmt.Println()
+						log.Printf("stopping processes")
 
 						for _, p := range procs {
 							err := p.Kill()
@@ -120,7 +131,8 @@ func main() {
 							}
 						}
 
-						log.Println("restarted processes")
+						log.Printf("restarted processes")
+						fmt.Println()
 
 						mu.Lock()
 						delete(timers, event.Name)
@@ -147,7 +159,8 @@ func main() {
 
 	<-sig
 
-	log.Println("stopping all processes")
+	fmt.Println()
+	log.Printf("stopping all processes")
 
 	err = pm.StopAll()
 	if err != nil {

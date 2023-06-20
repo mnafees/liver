@@ -18,8 +18,8 @@ func NewProcessManager() *ProcessManager {
 	}
 }
 
-func (pm *ProcessManager) Add(path, command string) {
-	p := newProcess(command)
+func (pm *ProcessManager) Add(idx uint, path, command string) {
+	p := newProcess(idx, command)
 
 	if _, ok := pm.procs[path]; !ok {
 		pm.procs[path] = make([]*process, 0)
