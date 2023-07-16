@@ -4,22 +4,28 @@ import (
 	"log"
 	"strings"
 	"sync"
+
+	"github.com/mnafees/liver/internal/sharedbuffer"
 )
 
+type PathPrefix string
+
 type ProcessManager struct {
-	procs map[string][]*process
-	mu    *sync.Mutex
+	bufferFactory *sharedbuffer.Factory
+	procs         map[PathPrefix][]*process
+	mu            *sync.Mutex
 }
 
-func NewProcessManager() *ProcessManager {
+func NewProcessManager(factory *sharedbuffer.Factory) *ProcessManager {
 	return &ProcessManager{
-		procs: make(map[string][]*process),
-		mu:    &sync.Mutex{},
+		bufferFactory: factory,
+		procs:         make(map[PathPrefix][]*process),
+		mu:            &sync.Mutex{},
 	}
 }
 
-func (pm *ProcessManager) Add(idx uint, path, command string) {
-	p := newProcess(idx, command)
+func (pm *ProcessManager) Add(path PathPrefix, command string) {
+	p := newProcess(uint(len(pm.procs)), pm.bufferFactory, command)
 
 	if _, ok := pm.procs[path]; !ok {
 		pm.procs[path] = make([]*process, 0)
@@ -60,15 +66,34 @@ func (pm *ProcessManager) StopAll() error {
 	return nil
 }
 
+func (pm *ProcessManager) GetProcNames() []string {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	var procNames []string
+
+	for _, procs := range pm.procs {
+		for _, p := range procs {
+			procNames = append(procNames, strings.Join(p.args, " "))
+		}
+	}
+
+	return procNames
+}
+
 func (pm *ProcessManager) GetProcs(path string) []*process {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
-	for procPath, procs := range pm.procs {
-		if strings.HasPrefix(path, procPath) {
-			return procs
+	var processes []*process
+
+	for prefix, procs := range pm.procs {
+		for _, proc := range procs {
+			if strings.HasPrefix(path, string(prefix)) {
+				processes = append(processes, proc)
+			}
 		}
 	}
 
-	return []*process{}
+	return processes
 }
